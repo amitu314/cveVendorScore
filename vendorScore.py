@@ -7,8 +7,21 @@ import time
 import argparse
 import re
 import warnings
+import prettytable
+
+global_table = prettytable.PrettyTable()
+global_table.field_names = ["Source", "CVE", "Severity", "Score", "Vector", "ECM"]
+
+def prettyTable(source, cve, sev, score, vector,ecm):
+    #table = prettytable.PrettyTable()
+    #table.field_names = ["Source","CVE", "Severity", "Score", "Vector", "ECM"]
+    #table.add_row([source,cve, sev, score, vector,ecm])
+    global_table.add_row([source, cve, sev, score, vector, ecm])
+    #print(table)
 
 def rhel_score_comparision(cve):
+    #print(cve, type(cve))
+    source = 'RedHat'
     url = 'https://access.redhat.com/hydra/rest/securitydata/cve/'+cve+'.json'
     response = requests.get(url)
     data = json.loads(response.content)
@@ -16,18 +29,21 @@ def rhel_score_comparision(cve):
         rh_severity = data['threat_severity']
         rh_score = data['cvss3']['cvss3_scoring_vector']
         rh_cvss = data['cvss3']['cvss3_base_score']
-        print("""RedHat
-              Severity: {0}
-              CVSS: {1}
-              CVSS Vector: {2}
-              """.format(rh_severity, rh_cvss, rh_score))
+        prettyTable(source, cve, rh_severity, rh_cvss,rh_score,None)
+        #print("""RedHat
+              #Severity: {0}
+              #CVSS: {1}
+              #CVSS Vector: {2}
+              #""".format(rh_severity, rh_cvss, rh_score))
         #print("RedHat Severity: " + rh_severity)
         return[cve,rh_severity,rh_score,rh_cvss]
     except Exception as e:
         #print('')
-        print("The RHEL data may not be available for " + cve) 
+        #print("The RHEL data may not be available for " + cve) 
+        prettyTable(source, cve, None, None, None, None)
 
 def ubuntu(cve):
+    source = 'Ubuntu'
     url = 'https://ubuntu.com/security/cves/'+cve+'.json'
     response = requests.get(url)
     if response.status_code == 200:
@@ -37,19 +53,21 @@ def ubuntu(cve):
             ub_cvss = data['impact']['baseMetricV3']['cvssV3']['vectorString']
             ub_score = data['cvss3']
             priority = ubuntu_priority(cve)
-            print("""Ubuntu
-                Severity: {0}
-                CVSS: {1}
-                CVSS Vector: {2}
-                Priority {3}
-                """.format(ub_severity, ub_score,ub_cvss,priority))
+            prettyTable(source, cve, priority, ub_score, ub_cvss, None)
+            #print("""Ubuntu
+                #Severity: {0}
+                #CVSS: {1}
+                #CVSS Vector: {2}
+                #Priority {3}
+                #""".format(ub_severity, ub_score,ub_cvss,priority))
             return[cve,ub_severity,ub_score,ub_cvss]
         except Exception as e:
             #print('')
-            print("The Ubuntu data may not be available for " + cve) 
+            #print("The Ubuntu data may not be available for " + cve) 
+            prettyTable(source, cve, None, None, None, None)
     else:
-        print(""" Ubuntu
-              response code {0}""".format(response.status_code))
+        prettyTable(source, cve, response.status_code, response.status_code, response.status_code, response.status_code)
+        #print(""" Ubuntu  response code {0}""".format(response.status_code))
 
 def ubuntu_priority(cve):
     url = 'https://ubuntu.com/security/cves/'+cve+'.json'
@@ -65,6 +83,7 @@ def ubuntu_priority(cve):
             print("The Ubuntu data may not be available for " + cve) 
     else:
         print("response code {0}".format(response.status_code))
+
 
 def newAmazon(cve):
     source = 'Amazon Linux'
@@ -87,12 +106,9 @@ def newAmazon(cve):
     else:
         #print("The Amazon linux data may not be available for " + cve)
         prettyTable(source, cve, None, None, None, None)
-Severity: {0}
-Cvss_vector: {1} """.format(cvss_score,cvss_vector))
-    except Exception as e:
-        print("The Amazon linux data may not be available for " + cve)
 
 def cisaADP(cve):
+    source = 'CISA ADP'
     adpSev = ''
     adpvector = ''
     cveYear = cve.split('-')[1]
@@ -105,7 +121,8 @@ def cisaADP(cve):
     #print(adpURL)
     response = requests.get(adpURL)
     if response.status_code != 200:
-        print("The CISA ADP data may not be available for " + cve)
+        prettyTable(source, cve, response.status_code, response.status_code, response.status_code, response.status_code)
+        #print("The CISA ADP data may not be available for " + cve)
     else:
         content = json.loads(response.content)
         container = content.get('containers')
@@ -135,22 +152,37 @@ def cisaADP(cve):
                                     adpSev = comp.get('cvssV3_1').get('baseSeverity')
                                     adpvector = comp.get('cvssV3_1').get('vectorString')
                                     
-                
-                print("""CISA ADP
-                Severity: {0}
-                CVSS Vector: {1}
-                Exploitation: {2} 
-                        """.format(adpSev, adpvector,ecm))
+                prettyTable(source, cve, adpSev, None, adpvector,ecm)
+                #print("""CISA ADP
+                #Severity: {0}
+                #CVSS Vector: {1}
+                #Exploitation: {2} 
+                        #""".format(adpSev, adpvector,ecm))
             
+
         
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Generating triage template for CVEs.')
-    parser.add_argument("--cve", required=True, type=str, help='CVE ID to triage.')
-    args = parser.parse_args()
-    rhel_score_comparision(args.cve)
-    ubuntu(args.cve)   
-    newAmazon(args.cve)
-    cisaADP(args.cve)
+    testInput = input("Are you running this  using a list instead of 1 cve? Press y if yes else n ").strip()
+    if testInput == "y":
+        cveList = ['CVE-2025-6595', 'CVE-2025-48379']
+        for cve in cveList:
+            #print(f"Vendor Score for {cve} \n")
+            rhel_score_comparision(cve)
+            ubuntu(cve)   
+            exploreALAS(cve)
+            cisaADP(cve)
+            #print("\n")
+        print(global_table)
+    else:
+        #parser = argparse.ArgumentParser(description='Generating triage template for CVEs.')
+        #parser.add_argument("--cve", required=True, type=str, help='CVE ID to triage.')
+        #args = parser.parse_args()
+        cveInput = input("Enter CVE:").strip()
+        rhel_score_comparision(str(cveInput))
+        ubuntu(str(cveInput))   
+        exploreALAS(str(cveInput))
+        cisaADP(str(cveInput))
+        print(global_table)
 
    
