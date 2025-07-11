@@ -67,25 +67,26 @@ def ubuntu_priority(cve):
         print("response code {0}".format(response.status_code))
 
 def newAmazon(cve):
-    amznURL = 'https://alas.aws.amazon.com/cve/html/' + cve + '.html'
+    source = 'Amazon Linux'
+    amznURL = 'https://explore.alas.aws.amazon.com/' + cve + '.json'
     response = requests.get(amznURL)
-    try:
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            soup = BeautifulSoup(response.content, 'html.parser')
-            if any("XMLParsedAsHTMLWarning" in str(warn.message) for warn in w):
-                soup = BeautifulSoup(response.content, 'xml')
-        row = soup.find_all('td')
-        for item in row:
-            if 'Amazon Linux' in item.text:
-                nextRow = item.find_next('td')
-                if nextRow and 'CVSS' in nextRow.text:
-                    cvssAMZN = item.find_next('a')
-                    if cvssAMZN:
-                        cvss_score = cvssAMZN.text.strip()
-                        vector = cvssAMZN['href']
-                        cvss_vector = vector.split('=')[1] if '=' in vector else vector
-                        print("""Amazon 
+    if response.status_code == 200:
+        data = response.json()
+        alasSev = data.get('severity')
+        alasScore = data.get('scores')
+        for item in alasScore:
+            if item.get('source') == 'AMAZON_LINUX':
+                amznScore = item.get('score')
+                amznCVSS = item.get('vector')
+                break
+        prettyTable(source, cve, alasSev, amznScore, amznCVSS,None)
+        #print(f"""Amazon Linux: 
+    #Severity: {alasSev} 
+    #Score: {amznScore} 
+    #Vector: {amznCVSS}""")
+    else:
+        #print("The Amazon linux data may not be available for " + cve)
+        prettyTable(source, cve, None, None, None, None)
 Severity: {0}
 Cvss_vector: {1} """.format(cvss_score,cvss_vector))
     except Exception as e:
